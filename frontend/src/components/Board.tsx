@@ -1,56 +1,81 @@
-// src/components/Board.tsx
 import React, { useState } from 'react';
-import { Chess, Square as ChessSquare } from 'chess.js';
 import Square from './Square';
 import Piece from './Piece';
+import { ChessBoard, Position } from '../lib/ChessLogic';
 
 const Board: React.FC = () => {
-  // Initialize the chess game state
-  const [game, setGame] = useState(new Chess());
-  const [selectedSquare, setSelectedSquare] = useState<ChessSquare | null>(null);
-  const [legalMoves, setLegalMoves] = useState<ChessSquare[]>([]);
+  const [game] = useState(new ChessBoard());
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
+  const [legalMoves, setLegalMoves] = useState<Position[]>([]);
 
-  // Handle click events on squares
-  const handleSquareClick = (square: ChessSquare) => {
-    if (selectedSquare) {
-      try {
-        // Attempt to move the selected piece to the clicked square
-        const move = game.move({ from: selectedSquare, to: square });
-        if (move) {
-          setGame(new Chess(game.fen()));
+  // Convert algebraic notation to Position
+  const toPosition = (square: string): Position => {
+    const file = square.charAt(0).toLowerCase();
+    const rank = parseInt(square.charAt(1));
+    return {
+      row: rank - 1,
+      col: file.charCodeAt(0) - 'a'.charCodeAt(0)
+    };
+  };
+
+  // Convert Position to algebraic notation
+  const toSquare = (pos: Position): string => {
+    const file = String.fromCharCode('a'.charCodeAt(0) + pos.col);
+    const rank = pos.row + 1;
+    return `${file}${rank}`;
+  };
+
+  const handleSquareClick = (square: string) => {
+    const position = toPosition(square);
+    const board = game.getBoard();
+
+    if (selectedPosition) {
+      // Attempt to move
+      const success = game.makeMove(selectedPosition, position);
+      if (success) {
+        // Force re-render
+        setSelectedPosition(null);
+        setLegalMoves([]);
+      } else {
+        // Check if clicking on another own piece
+        const piece = board[position.row][position.col];
+        if (piece && piece.color === game.getCurrentTurn()) {
+          setSelectedPosition(position);
+          // Get valid moves for the new selected piece
+          const validMoves = game.getValidMovesForPiece(position);
+          setLegalMoves(validMoves.map(move => move.to));
+        } else {
+          setSelectedPosition(null);
+          setLegalMoves([]);
         }
-      } catch (error) {
-        // Invalid move, just clear selection
       }
-      setSelectedSquare(null);
-      setLegalMoves([]);
     } else {
-      // Select a square if it has a piece for the current turn
-      const moves = game.moves({ square: square, verbose: true });
-      if (moves.length > 0) {
-        setSelectedSquare(square);
-        setLegalMoves(moves.map(m => m.to));
+      // Select a piece
+      const piece = board[position.row][position.col];
+      if (piece && piece.color === game.getCurrentTurn()) {
+        setSelectedPosition(position);
+        const validMoves = game.getValidMovesForPiece(position);
+        setLegalMoves(validMoves.map(move => move.to));
       }
     }
   };
 
-  // Render the board using algebraic notation
   const renderBoard = () => {
     const squares = [];
-    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-    // Iterate from rank 8 down to 1
-    for (let rank = 8; rank >= 1; rank--) {
-      for (let fileIndex = 0; fileIndex < 8; fileIndex++) {
-        const file = files[fileIndex];
-        const square = (file + rank) as ChessSquare;
-        // Get the piece on this square (if any)
-        const piece = game.get(square) || null;  // Convert undefined to null
+    const board = game.getBoard();
+
+    // Iterate from rank 8 down to 1 (row 7 to 0)
+    for (let row = 7; row >= 0; row--) {
+      for (let col = 0; col < 8; col++) {
+        const square = toSquare({ row, col });
+        const piece = board[row][col];
+        
         squares.push(
           <Square
             key={square}
             square={square}
-            isSelected={selectedSquare === square}
-            isLegalMove={legalMoves.includes(square)}
+            isSelected={selectedPosition?.row === row && selectedPosition?.col === col}
+            isLegalMove={legalMoves.some(move => move.row === row && move.col === col)}
             onClick={() => handleSquareClick(square)}
           >
             {piece && <Piece piece={piece} />}
