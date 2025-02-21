@@ -21,9 +21,11 @@
   "description": "",
   "dependencies": {
     "@google/generative-ai": "^0.22.0",
+    "@types/ws": "^8.5.14",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "openai": "^4.85.3"
+    "openai": "^4.85.3",
+    "ws": "^8.18.1"
   }
 }

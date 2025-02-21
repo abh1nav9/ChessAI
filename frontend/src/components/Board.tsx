@@ -2,26 +2,89 @@ import React, { useState, useEffect } from 'react';
 import Square from './Square';
 import Piece from './Piece';
 import { ChessBoard, Position, Color, Move } from '../lib/ChessLogic';
+import { GameSocket } from '../services/GameSocket';
+import { Dialog } from '@headlessui/react';
 
 interface BoardProps {
-    gameMode: 'ai' | 'human';
+    gameMode: 'ai' | 'human' | 'online';
     difficulty?: 'easy' | 'medium' | 'hard';
+    roomId?: string;
+    onEndGame: () => void;
 }
 
-const Board: React.FC<BoardProps> = ({ gameMode, difficulty }) => {
+const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }) => {
     const [game] = useState(new ChessBoard());
     const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
     const [legalMoves, setLegalMoves] = useState<Position[]>([]);
-    // Add a state to force re-renders
     const [boardState, setBoardState] = useState<number>(0);
     const [isAIThinking, setIsAIThinking] = useState(false);
     const [aiProvider, setAiProvider] = useState<'OpenAI' | 'Gemini' | null>(null);
+    const [gameSocket, setGameSocket] = useState<GameSocket | null>(null);
+    const [playerColor, setPlayerColor] = useState<Color | null>(null);
+    const [opponentJoined, setOpponentJoined] = useState(false);
+    const [connectionError, setConnectionError] = useState<string | null>(null);
+    const [showGameStartPopup, setShowGameStartPopup] = useState(false);
+    const [gameStarted, setGameStarted] = useState(false);
+    const [isHost, setIsHost] = useState(false);
 
     useEffect(() => {
         if (gameMode === 'ai' && game.getCurrentTurn() === Color.BLACK) {
             makeAIMove();
         }
     }, [boardState, gameMode]);
+
+    useEffect(() => {
+        if (gameMode === 'online' && roomId) {
+            console.log('Starting online game. Room ID:', roomId);
+            setIsHost(!window.location.search.includes('roomId='));
+            const socket = new GameSocket(roomId);
+            
+            socket.onPlayerJoined((color) => {
+                console.log('Player color assigned:', color);
+                setPlayerColor(color === 'white' ? Color.WHITE : Color.BLACK);
+                setConnectionError(null);
+            });
+
+            socket.onGameStart(() => {
+                console.log('Game starting');
+                setOpponentJoined(true);
+                setGameStarted(true);
+                setShowGameStartPopup(true);
+                setTimeout(() => setShowGameStartPopup(false), 3000);
+            });
+
+            socket.onMove((from, to) => {
+                console.log('Opponent move received:', from, to);
+                const success = game.makeMove(from, to);
+                if (success) {
+                    console.log('Move applied successfully');
+                    setBoardState(prev => prev + 1);
+                } else {
+                    console.error('Failed to apply move');
+                }
+            });
+
+            socket.onGameEnd((reason) => {
+                console.log('Game ended:', reason);
+                setOpponentJoined(false);
+                setGameStarted(false);
+                setPlayerColor(null);
+                setConnectionError(`Game ended: ${reason}`);
+            });
+
+            socket.onConnectionError((error) => {
+                console.error('Connection error:', error);
+                setConnectionError(error);
+            });
+
+            setGameSocket(socket);
+
+            return () => {
+                console.log('Cleaning up game socket');
+                socket.disconnect();
+            };
+        }
+    }, [gameMode, roomId]);
 
     const makeAIMove = async () => {
         setIsAIThinking(true);
@@ -88,38 +151,54 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty }) => {
     };
 
     const handleSquareClick = (square: string) => {
-      const position = toPosition(square);
-      const board = game.getBoard();
-      const piece = board[position.row][position.col];
+        const position = toPosition(square);
+        
+        if (gameMode === 'online') {
+            // Add more detailed logging for online mode
+            console.log('Square clicked:', square);
+            console.log('Current turn:', game.getCurrentTurn());
+            console.log('Player color:', playerColor);
+            console.log('Opponent joined:', opponentJoined);
 
-      if (selectedPosition) {
-        // If a piece is already selected, try to move it
-        if (legalMoves.some(move => move.row === position.row && move.col === position.col)) {
-          const success = game.makeMove(selectedPosition, position);
-          if (success) {
-            setSelectedPosition(null);
-            setLegalMoves([]);
-            // Force a re-render
-            setBoardState(prev => prev + 1);
-          }
+            if (!opponentJoined) {
+                console.log('Waiting for opponent to join');
+                return;
+            }
+            if (playerColor !== game.getCurrentTurn()) {
+                console.log('Not your turn');
+                return;
+            }
+        }
+
+        const board = game.getBoard();
+        const piece = board[position.row][position.col];
+
+        if (selectedPosition) {
+            if (legalMoves.some(move => move.row === position.row && move.col === position.col)) {
+                console.log('Making move:', selectedPosition, position);
+                const success = game.makeMove(selectedPosition, position);
+                if (success) {
+                    if (gameMode === 'online' && gameSocket) {
+                        console.log('Sending move to opponent');
+                        gameSocket.sendMove(selectedPosition, position);
+                    }
+                    setSelectedPosition(null);
+                    setLegalMoves([]);
+                    setBoardState(prev => prev + 1);
+                }
+            } else if (piece && piece.color === game.getCurrentTurn()) {
+                setSelectedPosition(position);
+                const validMoves = game.getValidMovesForPiece(position);
+                setLegalMoves(validMoves.map(move => move.to));
+            } else {
+                setSelectedPosition(null);
+                setLegalMoves([]);
+            }
         } else if (piece && piece.color === game.getCurrentTurn()) {
-          // If clicking on another friendly piece, select it instead
-          setSelectedPosition(position);
-          const validMoves = game.getValidMovesForPiece(position);
-          setLegalMoves(validMoves.map(move => move.to));
-        } else {
-          // If clicking on an invalid square, deselect
-          setSelectedPosition(null);
-          setLegalMoves([]);
+            setSelectedPosition(position);
+            const validMoves = game.getValidMovesForPiece(position);
+            setLegalMoves(validMoves.map(move => move.to));
         }
-      } else {
-        // If no piece is selected, try to select one
-        if (piece && piece.color === game.getCurrentTurn()) {
-          setSelectedPosition(position);
-          const validMoves = game.getValidMovesForPiece(position);
-          setLegalMoves(validMoves.map(move => move.to));
-        }
-      }
     };
 
     const renderBoard = () => {
@@ -169,6 +248,28 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty }) => {
             : 'bg-blue-500';
     };
 
+    const handleEndGame = () => {
+        if (gameMode === 'online' && gameSocket) {
+            gameSocket.disconnect();
+        }
+        onEndGame();
+    };
+
+    const handleCopyRoomId = () => {
+        if (roomId) {
+            navigator.clipboard.writeText(roomId);
+            // Show temporary feedback
+            const button = document.getElementById('copy-button');
+            if (button) {
+                const originalText = button.innerText;
+                button.innerText = 'Copied!';
+                setTimeout(() => {
+                    button.innerText = originalText;
+                }, 2000);
+            }
+        }
+    };
+
     return (
       <div className="flex flex-col items-center">
         {gameMode === 'ai' && aiProvider && (
@@ -176,11 +277,108 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty }) => {
                 {aiProvider}
             </div>
         )}
+        {/* Online game status */}
+        {gameMode === 'online' && (
+            <div className="mb-4">
+                <div className="text-lg font-bold text-center">
+                    {!gameStarted ? (
+                        <span className="text-blue-600">
+                            {isHost ? 
+                                "Waiting for opponent to join..." :
+                                "Connecting to game..."}
+                        </span>
+                    ) : (
+                        <div className="space-y-2">
+                            <span>Playing as {playerColor === Color.WHITE ? 'White' : 'Black'}</span>
+                            <div className="text-sm text-gray-600">
+                                ({isHost ? 'Room Host' : 'Joined Player'})
+                            </div>
+                        </div>
+                    )}
+                </div>
+                {roomId && !gameStarted && isHost && (
+                    <div className="mt-2 p-4 bg-white rounded-lg shadow-md">
+                        <div className="text-center mb-2">
+                            <div className="font-semibold mb-1">Room Host</div>
+                            <div className="mb-2">
+                                <span className="font-semibold">Room ID: </span>
+                                <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                                    {roomId}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 justify-center">
+                            <button
+                                id="copy-button"
+                                onClick={handleCopyRoomId}
+                                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            >
+                                Copy Room ID
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {!isHost && !gameStarted && (
+                    <div className="text-sm text-gray-600 text-center mt-2">
+                        Joining Room: {roomId}
+                    </div>
+                )}
+            </div>
+        )}
+        
+        {/* Game start popup */}
+        <Dialog
+            open={showGameStartPopup}
+            onClose={() => setShowGameStartPopup(false)}
+            className="fixed inset-0 z-10 overflow-y-auto"
+        >
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="fixed inset-0 bg-black opacity-30" />
+                <div className="relative bg-white rounded-lg p-8 max-w-md mx-auto text-center">
+                    <Dialog.Title className="text-2xl font-bold mb-4">
+                        Game Started!
+                    </Dialog.Title>
+                    <p className="mb-2">
+                        {playerColor === Color.WHITE ? 
+                            "You are playing as White" : 
+                            "You are playing as Black"}
+                    </p>
+                    <p className="text-sm text-gray-600 mb-4">
+                        {isHost ? '(Room Host)' : '(Joined Player)'}
+                    </p>
+                    <button
+                        onClick={() => setShowGameStartPopup(false)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                        Got it!
+                    </button>
+                </div>
+            </div>
+        </Dialog>
+
+        {/* Existing game status */}
         <div className="mb-4 text-xl font-bold">
-          {isAIThinking ? "AI is thinking..." : getGameStatus()}
+            {isAIThinking ? "AI is thinking..." : getGameStatus()}
         </div>
+
+        {/* Add connection error display */}
+        {connectionError && (
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+                {connectionError}
+            </div>
+        )}
+
+        {/* Existing board and end game button */}
         <div className="grid grid-cols-8 border-2 border-black" key={boardState}>
-          {renderBoard()}
+            {renderBoard()}
+        </div>
+        <div className="mt-6 flex gap-4">
+            <button
+                onClick={handleEndGame}
+                className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600"
+            >
+                End Game
+            </button>
         </div>
       </div>
     );

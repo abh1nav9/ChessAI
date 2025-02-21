@@ -3,29 +3,37 @@ import Board from './components/Board';
 import GameModeSelector from './components/GameModeSelector';
 
 const App: React.FC = () => {
-    const [gameMode, setGameMode] = useState<'ai' | 'human' | null>(null);
-    const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+    const [gameStarted, setGameStarted] = useState(false);
+    const [gameMode, setGameMode] = useState<'ai' | 'human' | 'online' | null>(null);
+    const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>();
+    const [roomId, setRoomId] = useState<string>();
 
-    const handleModeSelect = (mode: 'ai' | 'human', diff?: 'easy' | 'medium' | 'hard') => {
+    const handleModeSelect = (mode: 'ai' | 'human' | 'online', diff?: 'easy' | 'medium' | 'hard', room?: string) => {
         setGameMode(mode);
-        if (diff) {
-            setDifficulty(diff);
-        }
+        setDifficulty(diff);
+        setRoomId(room);
+        setGameStarted(true);
     };
 
-    if (!gameMode) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-                <h1 className="text-4xl font-bold mb-8">Chess Game</h1>
-                <GameModeSelector onModeSelect={handleModeSelect} />
-            </div>
-        );
-    }
+    const handleEndGame = () => {
+        setGameStarted(false);
+        setGameMode(null);
+        setDifficulty(undefined);
+        setRoomId(undefined);
+    };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-            <h1 className="text-4xl font-bold mb-8">Chess Game</h1>
-            <Board gameMode={gameMode} difficulty={difficulty} />
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+            {!gameStarted ? (
+                <GameModeSelector onModeSelect={handleModeSelect} />
+            ) : (
+                <Board
+                    gameMode={gameMode!}
+                    difficulty={difficulty}
+                    roomId={roomId}
+                    onEndGame={handleEndGame}
+                />
+            )}
         </div>
     );
 };
