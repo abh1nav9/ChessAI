@@ -46,7 +46,9 @@ export class ChessBoard {
     }
 
     private initializeBoard(): (Piece | null)[][] {
-        const board = Array(8).fill(null).map(() => Array(8).fill(null));
+        const board = Array(8)
+            .fill(null)
+            .map(() => Array(8).fill(null));
         
         // Initialize pawns
         for (let col = 0; col < 8; col++) {
@@ -70,6 +72,7 @@ export class ChessBoard {
 
     public isValidMove(from: Position, to: Position): boolean {
         const piece = this.board[from.row][from.col];
+        // Only allow moves for the piece of the current turn.
         if (!piece || piece.color !== this.currentTurn) return false;
         
         const possibleMoves = this.getValidMovesForPiece(from);
@@ -91,12 +94,17 @@ export class ChessBoard {
             this.handleCastling(move);
         }
 
-        // Execute move
-        this.board[to.row][to.col] = { ...piece, hasMoved: true };
+        // Execute move; update promotion if necessary
+        const movedPiece = { ...piece, hasMoved: true };
+        if (move.promotionPiece) {
+            movedPiece.type = move.promotionPiece;
+        }
+        this.board[to.row][to.col] = movedPiece;
         this.board[from.row][from.col] = null;
         
         this.lastMove = move;
         this.moveHistory.push(move);
+        // Swap turn
         this.currentTurn = this.currentTurn === Color.WHITE ? Color.BLACK : Color.WHITE;
 
         return true;
@@ -129,6 +137,7 @@ export class ChessBoard {
                 break;
         }
 
+        // Filter out moves that would leave the king in check.
         return moves.filter(move => !this.wouldResultInCheck(move, piece.color));
     }
 
@@ -136,28 +145,31 @@ export class ChessBoard {
         const piece = this.board[pos.row][pos.col]!;
         const direction = piece.color === Color.WHITE ? 1 : -1;
         
-        // Forward move
-        if (!this.board[pos.row + direction][pos.col]) {
+        // Forward move (with boundary check)
+        if (this.isValidPosition(pos.row + direction, pos.col) &&
+            !this.board[pos.row + direction][pos.col]) {
             moves.push({ from: pos, to: { row: pos.row + direction, col: pos.col }});
             
             // Double move from starting position
-            if (!piece.hasMoved && !this.board[pos.row + 2 * direction][pos.col]) {
+            if (!piece.hasMoved && this.isValidPosition(pos.row + 2 * direction, pos.col) &&
+                !this.board[pos.row + 2 * direction][pos.col]) {
                 moves.push({ from: pos, to: { row: pos.row + 2 * direction, col: pos.col }});
             }
         }
 
-        // Captures
+        // Captures and en passant
         for (const colOffset of [-1, 1]) {
             const newCol = pos.col + colOffset;
-            if (newCol >= 0 && newCol < 8) {
+            if (this.isValidPosition(pos.row + direction, newCol)) {
                 const targetPos = { row: pos.row + direction, col: newCol };
                 const targetPiece = this.board[targetPos.row][targetPos.col];
                 
+                // Regular capture
                 if (targetPiece && targetPiece.color !== piece.color) {
                     moves.push({ from: pos, to: targetPos, capturedPiece: targetPiece });
                 }
                 
-                // En passant
+                // En passant capture
                 if (this.isEnPassantPossible(pos, targetPos)) {
                     moves.push({
                         from: pos,
@@ -171,6 +183,7 @@ export class ChessBoard {
     }
 
     private addKnightMoves(pos: Position, moves: Move[]): void {
+        const piece = this.board[pos.row][pos.col]!;
         const knightOffsets = [
             [-2, -1], [-2, 1], [-1, -2], [-1, 2],
             [1, -2], [1, 2], [2, -1], [2, 1]
@@ -182,11 +195,11 @@ export class ChessBoard {
             
             if (this.isValidPosition(newRow, newCol)) {
                 const targetPiece = this.board[newRow][newCol];
-                if (!targetPiece || targetPiece.color !== this.currentTurn) {
+                if (!targetPiece || targetPiece.color !== piece.color) {
                     moves.push({
                         from: pos,
                         to: { row: newRow, col: newCol },
-                        capturedPiece: targetPiece
+                        capturedPiece: targetPiece || null
                     });
                 }
             }
@@ -209,10 +222,11 @@ export class ChessBoard {
     }
 
     private addKingMoves(pos: Position, moves: Move[]): void {
+        const piece = this.board[pos.row][pos.col]!;
         const directions = [
             [-1, -1], [-1, 0], [-1, 1],
-            [0, -1], [0, 1],
-            [1, -1], [1, 0], [1, 1]
+            [0, -1],          [0, 1],
+            [1, -1],  [1, 0], [1, 1]
         ];
 
         for (const [rowOffset, colOffset] of directions) {
@@ -221,46 +235,35 @@ export class ChessBoard {
             
             if (this.isValidPosition(newRow, newCol)) {
                 const targetPiece = this.board[newRow][newCol];
-                if (!targetPiece || targetPiece.color !== this.currentTurn) {
+                if (!targetPiece || targetPiece.color !== piece.color) {
                     moves.push({
                         from: pos,
                         to: { row: newRow, col: newCol },
-                        capturedPiece: targetPiece
+                        capturedPiece: targetPiece || null
                     });
                 }
             }
         }
 
-        // Castling
+        // Castling moves
         this.addCastlingMoves(pos, moves);
     }
 
     private addSlidingMoves(pos: Position, moves: Move[], directions: number[][]): void {
         const piece = this.board[pos.row][pos.col]!;
-
         for (const [rowDir, colDir] of directions) {
             let newRow = pos.row + rowDir;
             let newCol = pos.col + colDir;
-
             while (this.isValidPosition(newRow, newCol)) {
                 const targetPiece = this.board[newRow][newCol];
-                
                 if (!targetPiece) {
-                    moves.push({
-                        from: pos,
-                        to: { row: newRow, col: newCol }
-                    });
+                    moves.push({ from: pos, to: { row: newRow, col: newCol }});
                 } else {
                     if (targetPiece.color !== piece.color) {
-                        moves.push({
-                            from: pos,
-                            to: { row: newRow, col: newCol },
-                            capturedPiece: targetPiece
-                        });
+                        moves.push({ from: pos, to: { row: newRow, col: newCol }, capturedPiece: targetPiece });
                     }
                     break;
                 }
-
                 newRow += rowDir;
                 newCol += colDir;
             }
@@ -272,21 +275,18 @@ export class ChessBoard {
     }
 
     private wouldResultInCheck(move: Move, color: Color): boolean {
-        // Make temporary move
-        const originalBoard = this.board.map(row => [...row]);
+        // Deep clone board state
+        const originalBoard = JSON.parse(JSON.stringify(this.board));
+        // Simulate move
         this.board[move.to.row][move.to.col] = this.board[move.from.row][move.from.col];
         this.board[move.from.row][move.from.col] = null;
-
         const isInCheck = this.isInCheck(color);
-
-        // Restore board
+        // Restore board state
         this.board = originalBoard;
-
         return isInCheck;
     }
 
     private isInCheck(color: Color): boolean {
-        // Find king position
         const kingPos = this.findKing(color);
         if (!kingPos) return false;
 
@@ -295,18 +295,55 @@ export class ChessBoard {
             for (let col = 0; col < 8; col++) {
                 const piece = this.board[row][col];
                 if (piece && piece.color !== color) {
-                    const moves = this.getValidMovesForPiece({ row, col });
-                    if (moves.some(move => 
-                        move.to.row === kingPos.row && 
-                        move.to.col === kingPos.col
-                    )) {
-                        return true;
-                    }
+                    // Instead of using getValidMovesForPiece, check raw moves without recursion
+                    const canAttackKing = this.canPieceAttackSquare(
+                        { row, col },
+                        kingPos,
+                        piece
+                    );
+                    if (canAttackKing) return true;
                 }
             }
         }
-
         return false;
+    }
+
+    private canPieceAttackSquare(from: Position, to: Position, piece: Piece): boolean {
+        const dx = Math.abs(to.col - from.col);
+        const dy = Math.abs(to.row - from.row);
+
+        switch (piece.type) {
+            case PieceType.PAWN: {
+                const direction = piece.color === Color.WHITE ? 1 : -1;
+                return to.row === from.row + direction && Math.abs(to.col - from.col) === 1;
+            }
+            case PieceType.KNIGHT:
+                return (dx === 2 && dy === 1) || (dx === 1 && dy === 2);
+            case PieceType.BISHOP:
+                return dx === dy && this.isClearPath(from, to);
+            case PieceType.ROOK:
+                return (dx === 0 || dy === 0) && this.isClearPath(from, to);
+            case PieceType.QUEEN:
+                return (dx === dy || dx === 0 || dy === 0) && this.isClearPath(from, to);
+            case PieceType.KING:
+                return dx <= 1 && dy <= 1;
+            default:
+                return false;
+        }
+    }
+
+    private isClearPath(from: Position, to: Position): boolean {
+        const dx = Math.sign(to.col - from.col);
+        const dy = Math.sign(to.row - from.row);
+        let x = from.col + dx;
+        let y = from.row + dy;
+
+        while (x !== to.col || y !== to.row) {
+            if (this.board[y][x] !== null) return false;
+            x += dx;
+            y += dy;
+        }
+        return true;
     }
 
     private findKing(color: Color): Position | null {
@@ -323,10 +360,8 @@ export class ChessBoard {
 
     private isEnPassantPossible(from: Position, to: Position): boolean {
         if (!this.lastMove) return false;
-
         const piece = this.board[from.row][from.col]!;
         if (piece.type !== PieceType.PAWN) return false;
-
         const lastPiece = this.board[this.lastMove.to.row][this.lastMove.to.col]!;
         return lastPiece.type === PieceType.PAWN &&
                Math.abs(this.lastMove.from.row - this.lastMove.to.row) === 2 &&
@@ -335,12 +370,11 @@ export class ChessBoard {
     }
 
     private handlePawnSpecialMoves(move: Move, piece: Piece): void {
-        // Promotion
+        // Promotion: default to Queen upon reaching the last rank
         if ((piece.color === Color.WHITE && move.to.row === 7) ||
             (piece.color === Color.BLACK && move.to.row === 0)) {
-            move.promotionPiece = PieceType.QUEEN; // Default promotion to queen
+            move.promotionPiece = PieceType.QUEEN;
         }
-
         // En passant capture
         if (move.isEnPassant) {
             this.board[move.from.row][move.to.col] = null;
@@ -351,8 +385,7 @@ export class ChessBoard {
         const row = move.from.row;
         const rookFromCol = move.to.col > move.from.col ? 7 : 0;
         const rookToCol = move.to.col > move.from.col ? 5 : 3;
-
-        // Move rook
+        // Move the rook accordingly
         this.board[row][rookToCol] = this.board[row][rookFromCol];
         this.board[row][rookFromCol] = null;
         move.isCastling = true;
@@ -361,23 +394,13 @@ export class ChessBoard {
     private addCastlingMoves(pos: Position, moves: Move[]): void {
         const piece = this.board[pos.row][pos.col]!;
         if (piece.hasMoved || this.isInCheck(piece.color)) return;
-
         // Kingside castling
         if (this.canCastle(pos, true)) {
-            moves.push({
-                from: pos,
-                to: { row: pos.row, col: pos.col + 2 },
-                isCastling: true
-            });
+            moves.push({ from: pos, to: { row: pos.row, col: pos.col + 2 }, isCastling: true });
         }
-
         // Queenside castling
         if (this.canCastle(pos, false)) {
-            moves.push({
-                from: pos,
-                to: { row: pos.row, col: pos.col - 2 },
-                isCastling: true
-            });
+            moves.push({ from: pos, to: { row: pos.row, col: pos.col - 2 }, isCastling: true });
         }
     }
 
@@ -385,11 +408,9 @@ export class ChessBoard {
         const row = kingPos.row;
         const rookCol = isKingside ? 7 : 0;
         const rook = this.board[row][rookCol];
-
         if (!rook || rook.type !== PieceType.ROOK || rook.hasMoved) {
             return false;
         }
-
         const direction = isKingside ? 1 : -1;
         const endCol = isKingside ? 6 : 2;
 
@@ -400,12 +421,12 @@ export class ChessBoard {
             if (this.board[row][col] !== null) return false;
         }
 
-        // Check if squares the king moves through are not under attack
+        // Ensure squares the king passes through are not under attack
         for (let col = kingPos.col; 
              isKingside ? col <= endCol : col >= endCol; 
              col += direction) {
-            const king = this.board[kingPos.row][kingPos.col]!;
-            if (this.isSquareUnderAttack({ row, col }, king.color)) {
+            const kingPiece = this.board[kingPos.row][kingPos.col]!;
+            if (this.isSquareUnderAttack({ row, col }, kingPiece.color)) {
                 return false;
             }
         }
@@ -419,10 +440,7 @@ export class ChessBoard {
                 const piece = this.board[row][col];
                 if (piece && piece.color !== defendingColor) {
                     const moves = this.getValidMovesForPiece({ row, col });
-                    if (moves.some(move => 
-                        move.to.row === pos.row && 
-                        move.to.col === pos.col
-                    )) {
+                    if (moves.some(move => move.to.row === pos.row && move.to.col === pos.col)) {
                         return true;
                     }
                 }
@@ -433,8 +451,6 @@ export class ChessBoard {
 
     public isCheckmate(): boolean {
         if (!this.isInCheck(this.currentTurn)) return false;
-
-        // Check if any piece has valid moves
         for (let row = 0; row < 8; row++) {
             for (let col = 0; col < 8; col++) {
                 const piece = this.board[row][col];
@@ -444,14 +460,11 @@ export class ChessBoard {
                 }
             }
         }
-
         return true;
     }
 
     public isStalemate(): boolean {
         if (this.isInCheck(this.currentTurn)) return false;
-
-        // Check if any piece has valid moves
         for (let row = 0; row < 8; row++) {
             for (let col = 0; col < 8; col++) {
                 const piece = this.board[row][col];
@@ -461,7 +474,6 @@ export class ChessBoard {
                 }
             }
         }
-
         return true;
     }
 
