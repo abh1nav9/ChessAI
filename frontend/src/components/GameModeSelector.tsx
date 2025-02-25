@@ -69,33 +69,57 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
 
     if (showDifficulty) {
         return (
-            <div className="relative min-h-screen w-full flex items-center justify-center">
-                <div className="flex flex-col items-center space-y-8 max-w-sm mx-auto p-10 backdrop-blur-sm bg-white/5 rounded-2xl">
-                    <h2 className="text-4xl font-light tracking-wide text-white mb-6">Select Difficulty</h2>
-                    <button
-                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-emerald-500 text-white rounded-full hover:bg-emerald-500/20 transition-colors duration-200 text-xl"
-                        onClick={() => handleDifficultySelect('easy')}
-                    >
-                        Easy
-                    </button>
-                    <button
-                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-amber-500 text-white rounded-full hover:bg-amber-500/20 transition-colors duration-200 text-xl"
-                        onClick={() => handleDifficultySelect('medium')}
-                    >
-                        Medium
-                    </button>
-                    <button
-                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-rose-500 text-white rounded-full hover:bg-rose-500/20 transition-colors duration-200 text-xl"
-                        onClick={() => handleDifficultySelect('hard')}
-                    >
-                        Hard
-                    </button>
-                    <button
-                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-gray-300 text-white rounded-full hover:bg-gray-400/20 transition-colors duration-200 text-xl"
-                        onClick={() => setShowDifficulty(false)}
-                    >
-                        Back
-                    </button>
+            <div className="relative min-h-screen w-full">
+                {/* Video Background */}
+                <div className="absolute inset-0 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-b from-gray-900/80 to-gray-900/90 z-10"></div>
+                    <div className="video-container">
+                        <video 
+                            autoPlay 
+                            muted 
+                            loop 
+                            playsInline 
+                            onLoadedData={() => setIsVideoLoaded(true)}
+                            className={`video-background transition-opacity duration-1000 ${
+                                isVideoLoaded ? 'opacity-30' : 'opacity-0'
+                            }`}
+                        >
+                            <source src="/chess-bg.mp4" type="video/mp4" />
+                        </video>
+                    </div>
+                </div>
+
+                {/* Main content centered */}
+                <div className="relative z-30 min-h-screen flex items-center justify-center">
+                    <div className="backdrop-blur-sm bg-white/5 rounded-2xl">
+                        <div className="flex flex-col items-center space-y-8 max-w-sm mx-auto p-10">
+                            <h2 className="text-4xl font-light tracking-wide text-white mb-6">Select Difficulty</h2>
+                            <button
+                                className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-emerald-500 text-white rounded-full hover:bg-emerald-500/20 transition-colors duration-200 text-xl"
+                                onClick={() => handleDifficultySelect('easy')}
+                            >
+                                Easy
+                            </button>
+                            <button
+                                className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-amber-500 text-white rounded-full hover:bg-amber-500/20 transition-colors duration-200 text-xl"
+                                onClick={() => handleDifficultySelect('medium')}
+                            >
+                                Medium
+                            </button>
+                            <button
+                                className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-rose-500 text-white rounded-full hover:bg-rose-500/20 transition-colors duration-200 text-xl"
+                                onClick={() => handleDifficultySelect('hard')}
+                            >
+                                Hard
+                            </button>
+                            <button
+                                className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-gray-300 text-white rounded-full hover:bg-gray-400/20 transition-colors duration-200 text-xl"
+                                onClick={() => setShowDifficulty(false)}
+                            >
+                                Back
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -105,7 +129,7 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
         <div className="relative min-h-screen w-full">
             {/* Video Background */}
             <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-gray-1000/80 to-gray-1000/90 z-10"></div>
+                <div className="absolute inset-0 bg-gradient-to-b from-gray-900/80 to-gray-900/90 z-10"></div>
                 <div className="video-container">
                     <video 
                         autoPlay 
@@ -124,23 +148,23 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
 
             {/* Main content centered */}
             <div className="relative z-30 min-h-screen flex items-center justify-center">
-                <div className="backdrop-blur-sm bg-black/5 rounded-2xl">
+                <div className="backdrop-blur-sm bg-white/5 rounded-2xl">
                     <div className="flex flex-col items-center space-y-8 max-w-sm mx-auto p-10">
-                        <h2 className="text-3xl font-light tracking-wide text-black mb-6">Select Game Mode</h2>
+                        <h2 className="text-4xl font-light tracking-wide text-white mb-6">Select Game Mode</h2>
                         <button
-                            className="w-full px-8 py-4 bg-black/10 backdrop-blur-sm border-2 border-indigo-500 text-white rounded-full hover:bg-indigo-500/20 transition-colors duration-200 text-xl"
+                            className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-indigo-500 text-white rounded-full hover:bg-indigo-500/20 transition-colors duration-200 text-xl"
                             onClick={() => onModeSelect('human')}
                         >
                             Local Game
                         </button>
                         <button
-                            className="w-full px-8 py-4 bg-black/10 backdrop-blur-sm border-2 border-violet-500 text-white rounded-full hover:bg-violet-500/20 transition-colors duration-200 text-xl"
+                            className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-violet-500 text-white rounded-full hover:bg-violet-500/20 transition-colors duration-200 text-xl"
                             onClick={() => setShowRoomOptions(true)}
                         >
                             Online Game
                         </button>
                         <button
-                            className="w-full px-8 py-4 bg-black/10 backdrop-blur-sm border-2 border-emerald-500 text-white rounded-full hover:bg-emerald-500/20 transition-colors duration-200 text-xl"
+                            className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-emerald-500 text-white rounded-full hover:bg-emerald-500/20 transition-colors duration-200 text-xl"
                             onClick={handleAISelect}
                         >
                             Player vs AI

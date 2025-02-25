@@ -130,4 +130,15 @@ export class GameSocket {
             this.socket.close();
         }
     }
+
+    public sendGameOver(result: 'checkmate' | 'stalemate' | 'resignation', winner: 'white' | 'black' | null) {
+        if (this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'game_over',
+                result,
+                winner,
+                roomId: this.roomId
+            }));
+        }
+    }
 } 

@@ -313,157 +313,119 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
         }
     };
 
+    // Helper function to convert move to algebraic notation
+    const toAlgebraicNotation = (move: Move): string => {
+        const from = toSquare(move.from);
+        const to = toSquare(move.to);
+        return `${from}-${to}`;
+    };
+
     return (
-      <div className="flex flex-col items-center">
-        {gameMode === 'ai' && aiProvider && (
-            <div className={`fixed top-4 right-4 px-4 py-2 rounded-full text-white font-semibold ${getProviderBadgeClass()}`}>
-                {aiProvider}
-            </div>
-        )}
-        {/* Online game status */}
-        {gameMode === 'online' && (
-            <div className="mb-4">
-                <div className="text-lg font-bold text-center">
-                    {!gameStarted ? (
-                        <span className="text-blue-600">
-                            {isHost ? 
-                                "Waiting for opponent to join..." :
-                                "Connecting to game..."}
-                        </span>
-                    ) : (
-                        <div className="space-y-2">
-                            <span>Playing as {playerColor === Color.WHITE ? 'White' : 'Black'}</span>
-                            <div className="text-sm text-gray-600">
-                                ({isHost ? 'Room Host' : 'Joined Player'})
+        <div className="relative min-h-screen w-full bg-[#1a1a1a]">
+            <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent"></div>
+
+            <div className="relative z-10 flex items-center justify-center gap-24 min-h-screen p-8">
+                <div className="flex flex-col items-center">
+                    <div className="mb-6 text-2xl font-light text-white/90">
+                        {isAIThinking ? "AI is thinking..." : getGameStatus()}
+                    </div>
+
+                    <div className="flex bg-[#242424] p-6 rounded-xl">
+                        <div className="flex flex-col justify-center mr-2">
+                            {[8,7,6,5,4,3,2,1].map((number) => (
+                                <div key={number} className="h-20 flex items-center justify-center text-white/70 font-medium text-xl">
+                                    {number}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div>
+                            <div className="grid grid-cols-8 border border-gray-600" style={{ width: '640px', height: '640px' }}>
+                                {renderBoard()}
                             </div>
+
+                            <div className="flex justify-around mt-2">
+                                {['A','B','C','D','E','F','G','H'].map((letter) => (
+                                    <div key={letter} className="w-20 text-center text-white/70 font-medium text-xl">
+                                        {letter}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex gap-4">
+                        {gameMode === 'online' && gameStarted && !gameResult.result && (
+                            <button
+                                onClick={handleResign}
+                                className="px-6 py-3 bg-red-500/90 text-white rounded-lg hover:bg-red-600 text-lg transition-colors"
+                            >
+                                Resign
+                            </button>
+                        )}
+                        <button
+                            onClick={onEndGame}
+                            className="px-6 py-3 bg-gray-700/90 text-white rounded-lg hover:bg-gray-600 text-lg transition-colors"
+                        >
+                            End Game
+                        </button>
+                    </div>
+                </div>
+
+                <div className="w-96 bg-[#242424] rounded-xl p-8 h-[640px] flex flex-col shadow-xl">
+                    <h2 className="text-3xl font-light text-white/90 mb-6">Move History</h2>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="grid grid-cols-2 gap-4">
+                            {Array.from({ length: Math.ceil(game.moveHistory?.length / 2) }).map((_, index) => (
+                                <React.Fragment key={index}>
+                                    <div className="col-span-2 flex items-center text-xl text-white/80">
+                                        <span className="w-12 text-white/40">{index + 1}.</span>
+                                        <span className="flex-1">
+                                            {game.moveHistory[index * 2] && 
+                                                toAlgebraicNotation(game.moveHistory[index * 2])}
+                                        </span>
+                                        <span className="flex-1">
+                                            {game.moveHistory[index * 2 + 1] && 
+                                                toAlgebraicNotation(game.moveHistory[index * 2 + 1])}
+                                        </span>
+                                    </div>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </div>
+                    {aiProvider && (
+                        <div className="mt-4 text-sm text-white/50">
+                            AI Powered by: {aiProvider}
                         </div>
                     )}
                 </div>
-                {roomId && !gameStarted && isHost && (
-                    <div className="mt-2 p-4 bg-white rounded-lg shadow-md">
-                        <div className="text-center mb-2">
-                            <div className="font-semibold mb-1">Room Host</div>
-                            <div className="mb-2">
-                                <span className="font-semibold">Room ID: </span>
-                                <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                                    {roomId}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="flex gap-2 justify-center">
-                            <button
-                                id="copy-button"
-                                onClick={handleCopyRoomId}
-                                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                            >
-                                Copy Room ID
-                            </button>
-                        </div>
-                    </div>
-                )}
-                {!isHost && !gameStarted && (
-                    <div className="text-sm text-gray-600 text-center mt-2">
-                        Joining Room: {roomId}
-                    </div>
-                )}
             </div>
-        )}
-        
-        {/* Game start popup */}
-        <Dialog
-            open={showGameStartPopup}
-            onClose={() => setShowGameStartPopup(false)}
-            className="fixed inset-0 z-10 overflow-y-auto"
-        >
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="fixed inset-0 bg-black opacity-30" />
-                <div className="relative bg-white rounded-lg p-8 max-w-md mx-auto text-center">
-                    <Dialog.Title className="text-2xl font-bold mb-4">
-                        Game Started!
-                    </Dialog.Title>
-                    <p className="mb-2">
-                        {playerColor === Color.WHITE ? 
-                            "You are playing as White" : 
-                            "You are playing as Black"}
-                    </p>
-                    <p className="text-sm text-gray-600 mb-4">
-                        {isHost ? '(Room Host)' : '(Joined Player)'}
-                    </p>
-                    <button
-                        onClick={() => setShowGameStartPopup(false)}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                        Got it!
-                    </button>
-                </div>
-            </div>
-        </Dialog>
-
-        {/* Game status */}
-        <div className="mb-4 text-xl font-bold">
-            {isAIThinking ? "AI is thinking..." : getGameStatus()}
         </div>
-
-        {/* Game end popup */}
-        <Dialog
-            open={gameResult.result !== null}
-            onClose={() => {}}
-            className="fixed inset-0 z-10 overflow-y-auto"
-        >
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="fixed inset-0 bg-black opacity-30" />
-                <div className="relative bg-white rounded-lg p-8 max-w-md mx-auto text-center">
-                    <Dialog.Title className="text-2xl font-bold mb-4">
-                        Game Over!
-                    </Dialog.Title>
-                    <p className="mb-4 text-lg">
-                        {gameResult.result === 'stalemate' ? (
-                            'Game ended in Stalemate!'
-                        ) : gameResult.result === 'resignation' ? (
-                            `${gameResult.winner === 'white' ? 'White' : 'Black'} wins by resignation!`
-                        ) : (
-                            `${gameResult.winner === 'white' ? 'White' : 'Black'} wins by checkmate!`
-                        )}
-                    </p>
-                    <button
-                        onClick={onEndGame}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                        Return to Menu
-                    </button>
-                </div>
-            </div>
-        </Dialog>
-
-        {/* Add connection error display */}
-        {connectionError && (
-            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-                {connectionError}
-            </div>
-        )}
-
-        {/* Existing board and end game button */}
-        <div className="grid grid-cols-8 border-2 border-black" key={boardState}>
-            {renderBoard()}
-        </div>
-        <div className="mt-6 flex gap-4">
-            {gameMode === 'online' && gameStarted && !gameResult.result && (
-                <button
-                    onClick={handleResign}
-                    className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                >
-                    Resign
-                </button>
-            )}
-            <button
-                onClick={onEndGame}
-                className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-            >
-                End Game
-            </button>
-        </div>
-      </div>
     );
-  };
+};
 
-  export default Board;
+const styles = `
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #1a1a1a;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #404040;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #4a4a4a;
+}
+`;
+
+const styleSheet = document.createElement("style");
+styleSheet.innerText = styles;
+document.head.appendChild(styleSheet);
+
+export default Board;

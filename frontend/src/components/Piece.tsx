@@ -16,7 +16,7 @@ const pieceUnicode: { [key in PieceType]: { [key in Color]: string } } = {
 
 const Piece: React.FC<PieceProps> = ({ piece }) => {
   const symbol = pieceUnicode[piece.type][piece.color];
-  return <span className="text-3xl">{symbol}</span>;
+  return <span className="text-5xl select-none">{symbol}</span>;
 };
 
 export default Piece;

@@ -14,7 +14,7 @@ const Square: React.FC<SquareProps> = ({ square, isSelected, isLegalMove, onClic
   const rank = parseInt(square.charAt(1));
   const isDark = (file.charCodeAt(0) - 'a'.charCodeAt(0) + rank) % 2 === 0;
   
-  let className = `w-16 h-16 flex items-center justify-center cursor-pointer`;
+  let className = `w-20 h-20 flex items-center justify-center cursor-pointer`;
   
   // Base color
   className += isDark ? ' bg-gray-400' : ' bg-white';
