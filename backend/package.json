@@ -21,10 +21,13 @@
   "description": "",
   "dependencies": {
     "@google/generative-ai": "^0.22.0",
+    "@types/node": "^22.13.5",
     "@types/ws": "^8.5.14",
+    "chess.js": "^1.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "fs": "^0.0.1-security",
     "openai": "^4.85.3",
     "ws": "^8.18.1"
   }
