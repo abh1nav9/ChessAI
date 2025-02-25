@@ -118,6 +118,17 @@ export class GameServer {
                     });
                 }
                 break;
+            
+            case 'game_over':
+                // Handle checkmate, stalemate, or resignation
+                const { result, winner } = data;
+                this.broadcastToRoom(roomId, {
+                    type: 'game_end',
+                    result: result, // 'checkmate', 'stalemate', or 'resignation'
+                    winner: winner, // 'white' or 'black'
+                    reason: `Game Over - ${result} ${winner ? `- ${winner} wins!` : ''}`
+                });
+                break;
         }
     }
 

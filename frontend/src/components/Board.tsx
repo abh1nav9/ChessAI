@@ -26,6 +26,10 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
     const [showGameStartPopup, setShowGameStartPopup] = useState(false);
     const [gameStarted, setGameStarted] = useState(false);
     const [isHost, setIsHost] = useState(false);
+    const [gameResult, setGameResult] = useState<{
+        result: 'checkmate' | 'stalemate' | 'resignation' | null;
+        winner: 'white' | 'black' | null;
+    }>({ result: null, winner: null });
 
     useEffect(() => {
         if (gameMode === 'ai' && game.getCurrentTurn() === Color.BLACK) {
@@ -229,16 +233,55 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
       return squares;
     };
 
-    // Add game status display
+    // Function to handle game end
+    const handleGameEnd = (result: 'checkmate' | 'stalemate' | 'resignation', winner: 'white' | 'black' | null) => {
+        setGameResult({ result, winner });
+        if (gameSocket && gameMode === 'online') {
+            gameSocket.sendGameOver(result, winner);
+        }
+    };
+
+    // Check for checkmate or stalemate after each move
+    useEffect(() => {
+        if (game.isCheckmate()) {
+            const winner = game.getCurrentTurn() === Color.WHITE ? 'black' : 'white';
+            handleGameEnd('checkmate', winner);
+        } else if (game.isStalemate()) {
+            handleGameEnd('stalemate', null);
+        }
+    }, [boardState]);
+
+    // Handle resignation
+    const handleResign = () => {
+        if (gameMode === 'online' && playerColor) {
+            const winner = playerColor === Color.WHITE ? 'black' : 'white';
+            handleGameEnd('resignation', winner);
+        }
+    };
+
+    // Get game status message
     const getGameStatus = () => {
-      if (game.isCheckmate()) {
-        const winner = game.getCurrentTurn() === Color.WHITE ? "Black" : "White";
-        return `Checkmate! ${winner} wins!`;
-      }
-      if (game.isStalemate()) {
-        return "Stalemate! Game is drawn.";
-      }
-      return `${game.getCurrentTurn() === Color.WHITE ? "White" : "Black"}'s turn`;
+        if (gameResult.result) {
+            switch (gameResult.result) {
+                case 'checkmate':
+                    return `Checkmate! ${gameResult.winner === 'white' ? 'White' : 'Black'} wins!`;
+                case 'stalemate':
+                    return 'Game Over - Stalemate!';
+                case 'resignation':
+                    return `Game Over - ${gameResult.winner === 'white' ? 'White' : 'Black'} wins by resignation!`;
+                default:
+                    return '';
+            }
+        }
+
+        if (gameMode === 'online') {
+            if (!gameStarted) {
+                return isHost ? 'Waiting for opponent...' : 'Joining game...';
+            }
+            return `Playing as ${playerColor === Color.WHITE ? 'White' : 'Black'}`;
+        }
+
+        return `Current Turn: ${game.getCurrentTurn() === Color.WHITE ? 'White' : 'Black'}`;
     };
 
     const getProviderBadgeClass = () => {
@@ -356,10 +399,41 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
             </div>
         </Dialog>
 
-        {/* Existing game status */}
+        {/* Game status */}
         <div className="mb-4 text-xl font-bold">
             {isAIThinking ? "AI is thinking..." : getGameStatus()}
         </div>
+
+        {/* Game end popup */}
+        <Dialog
+            open={gameResult.result !== null}
+            onClose={() => {}}
+            className="fixed inset-0 z-10 overflow-y-auto"
+        >
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="fixed inset-0 bg-black opacity-30" />
+                <div className="relative bg-white rounded-lg p-8 max-w-md mx-auto text-center">
+                    <Dialog.Title className="text-2xl font-bold mb-4">
+                        Game Over!
+                    </Dialog.Title>
+                    <p className="mb-4 text-lg">
+                        {gameResult.result === 'stalemate' ? (
+                            'Game ended in Stalemate!'
+                        ) : gameResult.result === 'resignation' ? (
+                            `${gameResult.winner === 'white' ? 'White' : 'Black'} wins by resignation!`
+                        ) : (
+                            `${gameResult.winner === 'white' ? 'White' : 'Black'} wins by checkmate!`
+                        )}
+                    </p>
+                    <button
+                        onClick={onEndGame}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                        Return to Menu
+                    </button>
+                </div>
+            </div>
+        </Dialog>
 
         {/* Add connection error display */}
         {connectionError && (
@@ -373,9 +447,17 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
             {renderBoard()}
         </div>
         <div className="mt-6 flex gap-4">
+            {gameMode === 'online' && gameStarted && !gameResult.result && (
+                <button
+                    onClick={handleResign}
+                    className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                >
+                    Resign
+                </button>
+            )}
             <button
-                onClick={handleEndGame}
-                className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                onClick={onEndGame}
+                className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
             >
                 End Game
             </button>
