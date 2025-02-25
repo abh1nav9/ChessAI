@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface GameModeSelectorProps {
     onModeSelect: (mode: 'ai' | 'human' | 'online', difficulty?: 'easy' | 'medium' | 'hard', roomId?: string) => void;
@@ -8,6 +8,7 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
     const [showDifficulty, setShowDifficulty] = useState(false);
     const [showRoomOptions, setShowRoomOptions] = useState(false);
     const [roomId, setRoomId] = useState('');
+    const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
     const handleAISelect = () => {
         setShowDifficulty(true);
@@ -31,94 +32,231 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
 
     if (showRoomOptions) {
         return (
-            <div className="flex flex-col items-center space-y-4">
-                <h2 className="text-2xl font-bold mb-4">Online Game</h2>
-                <button
-                    className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-40"
-                    onClick={handleCreateRoom}
-                >
-                    Create Room
-                </button>
-                <div className="flex flex-col items-center space-y-2">
-                    <input
-                        type="text"
-                        placeholder="Enter Room ID"
-                        className="px-4 py-2 border rounded w-40"
-                        value={roomId}
-                        onChange={(e) => setRoomId(e.target.value)}
-                    />
+            <div className="relative min-h-screen w-full flex items-center justify-center">
+                <div className="flex flex-col items-center space-y-6 max-w-sm mx-auto p-8 backdrop-blur-sm bg-white/5 rounded-2xl">
+                    <h2 className="text-2xl font-light tracking-wide text-white">Online Game</h2>
                     <button
-                        className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 w-40"
-                        onClick={handleJoinRoom}
+                        className="w-full px-6 py-3 bg-white border-2 border-blue-500 text-blue-500 rounded-full hover:bg-blue-50 transition-colors duration-200"
+                        onClick={handleCreateRoom}
                     >
-                        Join Room
+                        Create Room
+                    </button>
+                    <div className="flex flex-col items-center space-y-3 w-full">
+                        <input
+                            type="text"
+                            placeholder="Enter Room ID"
+                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-full focus:outline-none focus:border-blue-500 transition-colors duration-200"
+                            value={roomId}
+                            onChange={(e) => setRoomId(e.target.value)}
+                        />
+                        <button
+                            className="w-full px-6 py-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors duration-200"
+                            onClick={handleJoinRoom}
+                        >
+                            Join Room
+                        </button>
+                    </div>
+                    <button
+                        className="w-full px-6 py-3 border-2 border-gray-300 text-gray-600 rounded-full hover:bg-gray-50 transition-colors duration-200"
+                        onClick={() => setShowRoomOptions(false)}
+                    >
+                        Back
                     </button>
                 </div>
-                <button
-                    className="px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 w-40"
-                    onClick={() => setShowRoomOptions(false)}
-                >
-                    Back
-                </button>
             </div>
         );
     }
 
     if (showDifficulty) {
         return (
-            <div className="flex flex-col items-center space-y-4">
-                <h2 className="text-2xl font-bold mb-4">Select Difficulty</h2>
-                <button
-                    className="px-6 py-3 bg-green-400 text-white rounded-lg hover:bg-green-500 w-40"
-                    onClick={() => handleDifficultySelect('easy')}
-                >
-                    Easy
-                </button>
-                <button
-                    className="px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 w-40"
-                    onClick={() => handleDifficultySelect('medium')}
-                >
-                    Medium
-                </button>
-                <button
-                    className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 w-40"
-                    onClick={() => handleDifficultySelect('hard')}
-                >
-                    Hard
-                </button>
-                <button
-                    className="px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 w-40"
-                    onClick={() => setShowDifficulty(false)}
-                >
-                    Back
-                </button>
+            <div className="relative min-h-screen w-full flex items-center justify-center">
+                <div className="flex flex-col items-center space-y-8 max-w-sm mx-auto p-10 backdrop-blur-sm bg-white/5 rounded-2xl">
+                    <h2 className="text-4xl font-light tracking-wide text-white mb-6">Select Difficulty</h2>
+                    <button
+                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-emerald-500 text-white rounded-full hover:bg-emerald-500/20 transition-colors duration-200 text-xl"
+                        onClick={() => handleDifficultySelect('easy')}
+                    >
+                        Easy
+                    </button>
+                    <button
+                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-amber-500 text-white rounded-full hover:bg-amber-500/20 transition-colors duration-200 text-xl"
+                        onClick={() => handleDifficultySelect('medium')}
+                    >
+                        Medium
+                    </button>
+                    <button
+                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-rose-500 text-white rounded-full hover:bg-rose-500/20 transition-colors duration-200 text-xl"
+                        onClick={() => handleDifficultySelect('hard')}
+                    >
+                        Hard
+                    </button>
+                    <button
+                        className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-gray-300 text-white rounded-full hover:bg-gray-400/20 transition-colors duration-200 text-xl"
+                        onClick={() => setShowDifficulty(false)}
+                    >
+                        Back
+                    </button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col items-center space-y-4">
-            <h2 className="text-2xl font-bold mb-4">Select Game Mode</h2>
-            <button
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-40"
-                onClick={() => onModeSelect('human')}
-            >
-                Local Game
-            </button>
-            <button
-                className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 w-40"
-                onClick={() => setShowRoomOptions(true)}
-            >
-                Online Game
-            </button>
-            <button
-                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 w-40"
-                onClick={handleAISelect}
-            >
-                Player vs AI
-            </button>
+        <div className="relative min-h-screen w-full">
+            {/* Video Background */}
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-gray-1000/80 to-gray-1000/90 z-10"></div>
+                <div className="video-container">
+                    <video 
+                        autoPlay 
+                        muted 
+                        loop 
+                        playsInline 
+                        onLoadedData={() => setIsVideoLoaded(true)}
+                        className={`video-background transition-opacity duration-1000 ${
+                            isVideoLoaded ? 'opacity-30' : 'opacity-0'
+                        }`}
+                    >
+                        <source src="/chess-bg.mp4" type="video/mp4" />
+                    </video>
+                </div>
+            </div>
+
+            {/* Main content centered */}
+            <div className="relative z-30 min-h-screen flex items-center justify-center">
+                <div className="backdrop-blur-sm bg-black/5 rounded-2xl">
+                    <div className="flex flex-col items-center space-y-8 max-w-sm mx-auto p-10">
+                        <h2 className="text-3xl font-light tracking-wide text-black mb-6">Select Game Mode</h2>
+                        <button
+                            className="w-full px-8 py-4 bg-black/10 backdrop-blur-sm border-2 border-indigo-500 text-white rounded-full hover:bg-indigo-500/20 transition-colors duration-200 text-xl"
+                            onClick={() => onModeSelect('human')}
+                        >
+                            Local Game
+                        </button>
+                        <button
+                            className="w-full px-8 py-4 bg-black/10 backdrop-blur-sm border-2 border-violet-500 text-white rounded-full hover:bg-violet-500/20 transition-colors duration-200 text-xl"
+                            onClick={() => setShowRoomOptions(true)}
+                        >
+                            Online Game
+                        </button>
+                        <button
+                            className="w-full px-8 py-4 bg-black/10 backdrop-blur-sm border-2 border-emerald-500 text-white rounded-full hover:bg-emerald-500/20 transition-colors duration-200 text-xl"
+                            onClick={handleAISelect}
+                        >
+                            Player vs AI
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
+
+// Updated styles with fixed video positioning
+const styles = `
+@keyframes floatChessPiece {
+    0% {
+        transform: translateY(100vh) rotate(0deg) scale(2);
+    }
+    100% {
+        transform: translateY(-100px) rotate(360deg) scale(2);
+    }
+}
+
+.chess-pieces-animation {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+}
+
+.chess-piece {
+    position: absolute;
+    font-size: 3rem;
+    color: #1a1a1a;
+    animation: floatChessPiece 15s linear infinite;
+}
+
+@keyframes slowZoom {
+    0% {
+        opacity: 0.4;
+        transform: scale(1.1);
+    }
+    50% {
+        opacity: 0.4;
+        transform: scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.3);
+    }
+}
+
+@keyframes slowZoomDelayed {
+    0% {
+        opacity: 0;
+        transform: scale(1.1);
+    }
+    50% {
+        opacity: 0.4;
+        transform: scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.3);
+    }
+}
+
+.chess-background {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+video {
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.animate-slow-zoom {
+    animation: slowZoom 10s infinite;
+}
+
+.animate-slow-zoom-delayed {
+    animation: slowZoomDelayed 10s infinite;
+}
+
+.video-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.video-background {
+    position: absolute;
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(1.1);
+    object-fit: cover;
+}
+`;
+
+// Inject styles
+const styleSheet = document.createElement("style");
+styleSheet.innerText = styles;
+document.head.appendChild(styleSheet);
 
 export default GameModeSelector; 
