@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import Board from './components/Board';
 import GameModeSelector from './components/GameModeSelector';
+import FileUpload from './components/FileUpload';
 
 const App: React.FC = () => {
     const [gameStarted, setGameStarted] = useState(false);
-    const [gameMode, setGameMode] = useState<'ai' | 'human' | 'online' | null>(null);
+    const [gameMode, setGameMode] = useState<'ai' | 'human' | 'online' | 'crypto' | null>(null);
     const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>();
     const [roomId, setRoomId] = useState<string>();
 
-    const handleModeSelect = (mode: 'ai' | 'human' | 'online', diff?: 'easy' | 'medium' | 'hard', room?: string) => {
+    const handleModeSelect = (mode: 'ai' | 'human' | 'online' | 'crypto', diff?: 'easy' | 'medium' | 'hard', room?: string) => {
         setGameMode(mode);
         setDifficulty(diff);
         setRoomId(room);
@@ -26,6 +27,8 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-gray-100 flex items-center justify-center">
             {!gameStarted ? (
                 <GameModeSelector onModeSelect={handleModeSelect} />
+            ) : gameMode === 'crypto' ? (
+                <FileUpload />
             ) : (
                 <Board
                     gameMode={gameMode!}

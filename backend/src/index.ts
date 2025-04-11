@@ -6,6 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import aiRoutes from './routes/aiRoutes';
+import cryptoRoutes from './routes/cryptoRoutes';
 import { GameServer } from './services/GameServer';
 
 const app = express();
@@ -19,6 +20,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/ai', aiRoutes);
+app.use('/api/crypto', cryptoRoutes);
 
 app.get('/', (req, res) => {
   res.send('Chess server running!');

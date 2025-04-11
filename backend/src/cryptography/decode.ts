@@ -15,10 +15,16 @@ export function decode(pgnString: string, outputFilePath: string): void {
   // Load games from PGN string.
   const games = getPgnGames(pgnString);
 
-  // Clear the output file.
+  // Ensure parent directory exists
+  const outputDir = outputFilePath.substring(0, Math.max(outputFilePath.lastIndexOf('/'), outputFilePath.lastIndexOf('\\')));
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  // Create or clear the output file
   fs.writeFileSync(outputFilePath, '');
 
-  // Open file in append mode.
+  // Open file in append mode
   const outputFd = fs.openSync(outputFilePath, 'a');
   let outputData = '';
 

@@ -11,11 +11,29 @@ import { toBinaryString } from './util';
 export function encode(filePath: string): string {
   const startTime = Date.now();
 
-  // Read the binary file.
-  console.log("reading file...");
-  const fileBuffer = fs.readFileSync(filePath);
-  const fileBytes: number[] = Array.from(fileBuffer);
-  const fileBitsCount = fileBytes.length * 8;
+  // Validate input
+  if (!fs.existsSync(filePath)) {
+    throw new Error('File not found');
+  }
+
+  let fileBytes: number[];
+  let fileBitsCount: number;
+
+  // Read the binary file
+  console.log("Reading file:", filePath);
+  try {
+    const fileBuffer = fs.readFileSync(filePath);
+    if (fileBuffer.length === 0) {
+      throw new Error('File is empty');
+    }
+    fileBytes = Array.from(fileBuffer);
+    fileBitsCount = fileBytes.length * 8;
+    console.log(`File size: ${fileBuffer.length} bytes`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error reading file:', errorMessage);
+    throw new Error(`Failed to read file: ${errorMessage}`);
+  }
 
   console.log("\nencoding file...");
   const outputPgns: string[] = [];
@@ -56,7 +74,7 @@ export function encode(filePath: string): string {
     const closestByteIndex = Math.floor(fileBitIndex / 8);
     const sliceBytes = fileBytes.slice(closestByteIndex, closestByteIndex + 2);
     const fileChunkPool = sliceBytes
-      .map(byte => toBinaryString(byte, 8))
+      .map((byte: number) => toBinaryString(byte, 8))
       .join('');
     const bitOffset = fileBitIndex % 8;
     const nextFileChunk = fileChunkPool.substr(bitOffset, maxBinaryLength);

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface GameModeSelectorProps {
-    onModeSelect: (mode: 'ai' | 'human' | 'online', difficulty?: 'easy' | 'medium' | 'hard', roomId?: string) => void;
+    onModeSelect: (mode: 'ai' | 'human' | 'online' | 'crypto', difficulty?: 'easy' | 'medium' | 'hard') => void;
 }
 
 const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => {
@@ -19,14 +19,12 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
     };
 
     const handleCreateRoom = () => {
-        // Generate a random room ID
-        const newRoomId = Math.random().toString(36).substring(2, 8);
-        onModeSelect('online', undefined, newRoomId);
+        onModeSelect('online');
     };
 
     const handleJoinRoom = () => {
         if (roomId.trim()) {
-            onModeSelect('online', undefined, roomId.trim());
+            onModeSelect('online');
         }
     };
 
@@ -35,6 +33,12 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
             <div className="relative min-h-screen w-full flex items-center justify-center">
                 <div className="flex flex-col items-center space-y-6 max-w-sm mx-auto p-8 backdrop-blur-sm bg-white/5 rounded-2xl">
                     <h2 className="text-2xl font-light tracking-wide text-white">Online Game</h2>
+                    <button
+                        className="w-full px-6 py-3 bg-white border-2 border-purple-500 text-purple-500 rounded-full hover:bg-purple-50 transition-colors duration-200"
+                        onClick={() => onModeSelect('crypto')}
+                    >
+                        Crypto Mode
+                    </button>
                     <button
                         className="w-full px-6 py-3 bg-white border-2 border-blue-500 text-blue-500 rounded-full hover:bg-blue-50 transition-colors duration-200"
                         onClick={handleCreateRoom}
@@ -168,6 +172,12 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
                             onClick={handleAISelect}
                         >
                             Player vs AI
+                        </button>
+                        <button
+                            className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-red-500 text-white rounded-full hover:bg-red-500/20 transition-colors duration-200 text-xl"
+                            onClick={() => onModeSelect('crypto')}
+                        >
+                            Crypto Mode
                         </button>
                     </div>
                 </div>

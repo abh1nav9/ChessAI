@@ -4,9 +4,10 @@ import Piece from './Piece';
 import { ChessBoard, Position, Color, Move } from '../lib/ChessLogic';
 import { GameSocket } from '../services/GameSocket';
 import { Dialog } from '@headlessui/react';
+import { StockfishService } from '../services/StockfishService';
 
 interface BoardProps {
-    gameMode: 'ai' | 'human' | 'online';
+    gameMode: 'ai' | 'human' | 'online' | 'competitive';
     difficulty?: 'easy' | 'medium' | 'hard';
     roomId?: string;
     onEndGame: () => void;
@@ -18,7 +19,7 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
     const [legalMoves, setLegalMoves] = useState<Position[]>([]);
     const [boardState, setBoardState] = useState<number>(0);
     const [isAIThinking, setIsAIThinking] = useState(false);
-    const [aiProvider, setAiProvider] = useState<'OpenAI' | 'Gemini' | null>(null);
+    const [aiProvider, setAiProvider] = useState<'OpenAI' | 'Gemini' | 'Stockfish' | null>(null);
     const [gameSocket, setGameSocket] = useState<GameSocket | null>(null);
     const [playerColor, setPlayerColor] = useState<Color | null>(null);
     const [opponentJoined, setOpponentJoined] = useState(false);
@@ -30,6 +31,7 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
         result: 'checkmate' | 'stalemate' | 'resignation' | null;
         winner: 'white' | 'black' | null;
     }>({ result: null, winner: null });
+    const [stockfish, setStockfish] = useState<StockfishService | null>(null);
 
     useEffect(() => {
         if (gameMode === 'ai' && game.getCurrentTurn() === Color.BLACK) {
@@ -90,36 +92,71 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
         }
     }, [gameMode, roomId]);
 
+    useEffect(() => {
+        if (gameMode === 'competitive') {
+            setPlayerColor(Color.WHITE);
+            const sf = new StockfishService();
+            setStockfish(sf);
+            setAiProvider('Stockfish');
+            return () => sf.destroy();
+        }
+    }, [gameMode]);
+
+    // Combine the AI move functions into one
     const makeAIMove = async () => {
         setIsAIThinking(true);
         try {
-            const board = game.getBoard();
-            const validMoves = getAllValidMoves(Color.BLACK);
-            
-            const response = await fetch('http://localhost:5000/api/ai/move', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    boardState: JSON.stringify(board),
-                    validMoves: validMoves,
-                    difficulty: difficulty || 'medium'
-                }),
-            });
+            if (gameMode === 'competitive' && stockfish) {
+                const fen = game.toFEN();
+                console.log('Sending position to Stockfish:', fen);
+                const move = await stockfish.getNextMove(fen);
+                console.log('Received move from Stockfish:', move);
+                const success = game.makeMove(move.from, move.to);
+                if (success) {
+                    setBoardState(prev => prev + 1);
+                    setAiProvider('Stockfish');
+                } else {
+                    console.error('Invalid Stockfish move:', move);
+                }
+            } else if (gameMode === 'ai') {
+                // Regular AI logic
+                const board = game.getBoard();
+                const validMoves = getAllValidMoves(Color.BLACK);
+                
+                const response = await fetch('http://localhost:5000/api/ai/move', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        boardState: JSON.stringify(board),
+                        validMoves: validMoves,
+                        difficulty: difficulty || 'medium'
+                    }),
+                });
 
-            const data = await response.json();
-            if (data.move) {
-                game.makeMove(data.move.from, data.move.to);
-                setBoardState(prev => prev + 1);
-                setAiProvider(data.provider);
-            }
-        } catch (error) {
+                const data = await response.json();
+                if (data.move) {
+                    game.makeMove(data.move.from, data.move.to);
+                    setBoardState(prev => prev + 1);
+                    setAiProvider(data.provider);
+                }
+        }
+      } catch (error) {
             console.error('Error making AI move:', error);
         } finally {
             setIsAIThinking(false);
         }
     };
+
+    // Remove the separate makeStockfishMove function and update the useEffect
+    useEffect(() => {
+        if ((gameMode === 'ai' || gameMode === 'competitive') && 
+            game.getCurrentTurn() === Color.BLACK && 
+            !gameResult.result) {
+            makeAIMove();
+        }
+    }, [boardState, gameMode]);
 
     const getAllValidMoves = (color: Color) => {
         const moves: Move[] = [];
@@ -174,6 +211,13 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
             }
         }
 
+        if (gameMode === 'competitive') {
+            // Only allow moves when it's player's turn (White)
+            if (game.getCurrentTurn() !== Color.WHITE) {
+                return;
+            }
+        }
+
         const board = game.getBoard();
         const piece = board[position.row][position.col];
 
@@ -187,14 +231,14 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
                         gameSocket.sendMove(selectedPosition, position);
                     }
                     setSelectedPosition(null);
-                    setLegalMoves([]);
+      setLegalMoves([]);
                     setBoardState(prev => prev + 1);
                 }
             } else if (piece && piece.color === game.getCurrentTurn()) {
                 setSelectedPosition(position);
                 const validMoves = game.getValidMovesForPiece(position);
                 setLegalMoves(validMoves.map(move => move.to));
-            } else {
+    } else {
                 setSelectedPosition(null);
                 setLegalMoves([]);
             }
@@ -205,10 +249,10 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
         }
     };
 
-    const renderBoard = () => {
+  const renderBoard = () => {
       // Use boardState in the function to avoid the unused variable warning
       const board = game.getBoard();
-      const squares = [];
+    const squares = [];
       console.log('Rendering board state:', boardState);  // Optional, helps with debugging
 
       // Iterate from rank 8 down to 1 (row 7 to 0)
@@ -217,21 +261,21 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
           const square = toSquare({ row, col });
           const piece = board[row][col];
           
-          squares.push(
-            <Square
-              key={square}
-              square={square}
+        squares.push(
+          <Square
+            key={square}
+            square={square}
               isSelected={selectedPosition?.row === row && selectedPosition?.col === col}
               isLegalMove={legalMoves.some(move => move.row === row && move.col === col)}
-              onClick={() => handleSquareClick(square)}
-            >
-              {piece && <Piece piece={piece} />}
-            </Square>
-          );
-        }
+            onClick={() => handleSquareClick(square)}
+          >
+            {piece && <Piece piece={piece} />}
+          </Square>
+        );
       }
-      return squares;
-    };
+    }
+    return squares;
+  };
 
     // Function to handle game end
     const handleGameEnd = (result: 'checkmate' | 'stalemate' | 'resignation', winner: 'white' | 'black' | null) => {
@@ -281,6 +325,13 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
             return `Playing as ${playerColor === Color.WHITE ? 'White' : 'Black'}`;
         }
 
+        if (gameMode === 'competitive') {
+            if (isAIThinking) {
+                return "Stockfish is thinking...";
+            }
+            return `Your turn (White)${game.getCurrentTurn() === Color.BLACK ? ' - Stockfish is thinking...' : ''}`;
+        }
+
         return `Current Turn: ${game.getCurrentTurn() === Color.WHITE ? 'White' : 'Black'}`;
     };
 
@@ -288,7 +339,9 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
         if (!aiProvider) return '';
         return aiProvider === 'OpenAI' 
             ? 'bg-green-500'
-            : 'bg-blue-500';
+            : aiProvider === 'Gemini' 
+                ? 'bg-blue-500'
+                : 'bg-purple-500';
     };
 
     const handleEndGame = () => {
@@ -320,7 +373,7 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
         return `${from}-${to}`;
     };
 
-    return (
+  return (
         <div className="relative min-h-screen w-full bg-[#1a1a1a]">
             <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent"></div>
 
@@ -341,7 +394,7 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
 
                         <div>
                             <div className="grid grid-cols-8 border border-gray-600" style={{ width: '640px', height: '640px' }}>
-                                {renderBoard()}
+      {renderBoard()}
                             </div>
 
                             <div className="flex justify-around mt-2">
@@ -400,8 +453,15 @@ const Board: React.FC<BoardProps> = ({ gameMode, difficulty, roomId, onEndGame }
                     )}
                 </div>
             </div>
-        </div>
-    );
+
+            {/* Add Stockfish badge for competitive mode */}
+            {gameMode === 'competitive' && (
+                <div className="fixed top-4 right-4 px-4 py-2 bg-red-600 text-white rounded-full font-semibold">
+                    Playing against Stockfish
+                </div>
+            )}
+    </div>
+  );
 };
 
 const styles = `

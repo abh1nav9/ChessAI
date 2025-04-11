@@ -484,4 +484,42 @@ export class ChessBoard {
     public getCurrentTurn(): Color {
         return this.currentTurn;
     }
+
+    public toFEN(): string {
+        let fen = '';
+        for (let row = 7; row >= 0; row--) {
+            let emptySquares = 0;
+            for (let col = 0; col < 8; col++) {
+                const piece = this.board[row][col];
+                if (piece === null) {
+                    emptySquares++;
+                } else {
+                    if (emptySquares > 0) {
+                        fen += emptySquares;
+                        emptySquares = 0;
+                    }
+                    const pieceChar = this.getPieceChar(piece);
+                    fen += piece.color === Color.WHITE ? pieceChar.toUpperCase() : pieceChar.toLowerCase();
+                }
+            }
+            if (emptySquares > 0) {
+                fen += emptySquares;
+            }
+            if (row > 0) fen += '/';
+        }
+        
+        fen += ` ${this.currentTurn === Color.WHITE ? 'w' : 'b'} - - 0 1`;
+        return fen;
+    }
+
+    private getPieceChar(piece: Piece): string {
+        switch (piece.type) {
+            case PieceType.KING: return 'k';
+            case PieceType.QUEEN: return 'q';
+            case PieceType.ROOK: return 'r';
+            case PieceType.BISHOP: return 'b';
+            case PieceType.KNIGHT: return 'n';
+            case PieceType.PAWN: return 'p';
+        }
+    }
 }
