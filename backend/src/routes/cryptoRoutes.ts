@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import path from 'path';
 import { encode } from '../cryptography/encode';
 import { decode } from '../cryptography/decode';
+import { calculateChecksum } from '../cryptography/util';
 
 const router = express.Router();
 
@@ -18,7 +19,9 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    // Use original filename but sanitize it
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, `${Date.now()}-${safeName}`);
   },
 });
 
@@ -96,6 +99,11 @@ router.post('/encode', (req: Request, res: Response, next: NextFunction) => {
           throw new Error('Only text files are supported for encoding');
         }
 
+        // Calculate checksum before encoding
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const originalChecksum = calculateChecksum(fileBuffer);
+        console.log(`Original file checksum: ${originalChecksum}`);
+
         console.log('File path:', req.file.path);
         try {
           const pgn = encode(req.file.path);
@@ -104,6 +112,11 @@ router.post('/encode', (req: Request, res: Response, next: NextFunction) => {
           // Validate the generated PGN
           if (!pgn || pgn.trim() === '') {
             throw new Error('Generated PGN is empty');
+          }
+
+          // Verify that the PGN contains our checksum
+          if (!pgn.includes(`[Checksum "${originalChecksum}"]`)) {
+            console.warn('PGN does not contain the original checksum!');
           }
 
           // Clean up the uploaded file
@@ -165,9 +178,22 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
             throw new Error('PGN file is empty');
           }
 
-          // More lenient PGN format validation - just check if it's not empty
-          // Some PGN files might not follow the standard format
-          console.log('Processing PGN content regardless of format');
+          // Check if this appears to be a ChessCrypto file
+          const isChessCryptoFile = pgnContent.includes('[Event "ChessCrypto File"]') || 
+                                    pgnContent.includes('[FileSize "') ||
+                                    pgnContent.includes('[Checksum "');
+                                    
+          if (!isChessCryptoFile) {
+            console.warn('The PGN file does not appear to be a ChessCrypto file');
+          }
+          
+          // Extract expected checksum for validation
+          let expectedChecksum: string | null = null;
+          const checksumMatch = pgnContent.match(/\[Checksum "([a-fA-F0-9]+)"\]/);
+          if (checksumMatch && checksumMatch[1]) {
+            expectedChecksum = checksumMatch[1];
+            console.log('Found checksum in PGN:', expectedChecksum);
+          }
           
           // Create output path for decoded file
           const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -199,6 +225,32 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
           if (stats.size === 0) {
             throw new Error('Decoded file is empty');
           }
+          
+          // Verify the checksum of the decoded file
+          if (expectedChecksum) {
+            const decodedBuffer = fs.readFileSync(outputPath);
+            const actualChecksum = calculateChecksum(decodedBuffer);
+            
+            console.log(`Checksum verification: Expected=${expectedChecksum}, Actual=${actualChecksum}`);
+            
+            if (actualChecksum !== expectedChecksum) {
+              console.warn(`Warning: Checksum mismatch! The decoded file may be corrupted.`);
+            } else {
+              console.log(`✓ Checksum verified: The decoded file is intact.`);
+            }
+          }
+          
+          // Validate that the decoded file appears to be text
+          try {
+            const fileHead = fs.readFileSync(outputPath, { encoding: 'utf8', flag: 'r' }).slice(0, 100);
+            // Check if this looks like a text file (simple heuristic)
+            const isBinary = /[\x00-\x08\x0E-\x1F\x7F-\xFF]/.test(fileHead);
+            if (isBinary) {
+              console.warn('Warning: Decoded file appears to contain binary data, but only text files are fully supported');
+            }
+          } catch (validateError) {
+            console.warn('Warning: Could not validate decoded file content:', validateError);
+          }
         } catch (error) {
           console.error('Decode process error:', error);
           throw error;
@@ -214,8 +266,18 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
                 return;
               }
               // Clean up files after sending
-              fs.unlinkSync(req.file!.path);
-              fs.unlinkSync(outputPath!);
+              try {
+                fs.unlinkSync(req.file!.path);
+              } catch (e) {
+                console.warn('Failed to delete uploaded PGN file:', e);
+              }
+              
+              try {
+                fs.unlinkSync(outputPath!);
+              } catch (e) {
+                console.warn('Failed to delete temporary decoded file:', e);
+              }
+              
               resolve();
             });
           });
@@ -225,7 +287,7 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
         }
       } catch (error) {
         console.error('Decode error:', error);
-        res.status(500).json({ error: 'Failed to decode file' });
+        res.status(500).json({ error: 'Failed to decode file', details: error instanceof Error ? error.message : String(error) });
       }
     })();
   });
