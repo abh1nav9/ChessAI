@@ -522,4 +522,8 @@ export class ChessBoard {
             case PieceType.PAWN: return 'p';
         }
     }
+
+    public getMoveHistory(): Move[] {
+        return [...this.moveHistory];
+    }
 }

@@ -14,12 +14,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onPgnGenerated }) => {
   const [outputFormat, setOutputFormat] = useState('txt');
 
   const outputFormats = [
-    { value: 'txt', label: 'Text File (.txt)' },
-    { value: 'json', label: 'JSON File (.json)' },
-    { value: 'xml', label: 'XML File (.xml)' },
-    { value: 'csv', label: 'CSV File (.csv)' },
-    { value: 'pdf', label: 'PDF File (.pdf)' },
-    { value: 'doc', label: 'Word Document (.doc)' }
+    { value: 'txt', label: 'Text File (.txt)' }
   ];
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,8 +52,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onPgnGenerated }) => {
 
     try {
       console.log('Sending request to server...');
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = hostname === 'localhost' ? ':5000' : '';
+      const apiUrl = `${protocol}//${hostname}${port}/api/crypto/${mode}`;
+      
       const response = await axios.post(
-        `http://localhost:5000/api/crypto/${mode}`,
+        apiUrl,
         formData,
         {
           headers: {

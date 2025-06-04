@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface GameModeSelectorProps {
-    onModeSelect: (mode: 'ai' | 'human' | 'online' | 'crypto', difficulty?: 'easy' | 'medium' | 'hard') => void;
+    onModeSelect: (mode: 'ai' | 'human' | 'online' | 'crypto', difficulty?: 'easy' | 'medium' | 'hard', room?: string) => void;
 }
 
 const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => {
@@ -19,12 +19,32 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
     };
 
     const handleCreateRoom = () => {
-        onModeSelect('online');
+        // Generate a random room ID (6 characters, uppercase letters and numbers)
+        const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        setRoomId(newRoomId);
+        console.log('Created room with ID:', newRoomId);
+        
+        // IMPORTANT: Do NOT add the roomId= prefix when creating a room
+        // This ensures the creator will be assigned as WHITE
+        onModeSelect('online', undefined, newRoomId);
+        
+        // Log to help with debugging
+        console.log('Created new room without roomId= prefix');
     };
 
     const handleJoinRoom = () => {
         if (roomId.trim()) {
-            onModeSelect('online');
+            // Normalize the room ID to uppercase and remove any non-alphanumeric characters
+            const normalizedRoomId = roomId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            setRoomId(normalizedRoomId);
+            console.log('Joining room with ID:', normalizedRoomId);
+            
+            // Make it very explicit that this is a joining request
+            // This is important because the server uses this to determine if a player is joining vs creating
+            onModeSelect('online', undefined, `roomId=${normalizedRoomId}`);
+            
+            // Log to help with debugging
+            console.log('Sent joining request with roomId parameter');
         }
     };
 
@@ -33,12 +53,12 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
             <div className="relative min-h-screen w-full flex items-center justify-center">
                 <div className="flex flex-col items-center space-y-6 max-w-sm mx-auto p-8 backdrop-blur-sm bg-white/5 rounded-2xl">
                     <h2 className="text-2xl font-light tracking-wide text-white">Online Game</h2>
-                    <button
+                    {/* <button
                         className="w-full px-6 py-3 bg-white border-2 border-purple-500 text-purple-500 rounded-full hover:bg-purple-50 transition-colors duration-200"
                         onClick={() => onModeSelect('crypto')}
                     >
                         Crypto Mode
-                    </button>
+                    </button> */}
                     <button
                         className="w-full px-6 py-3 bg-white border-2 border-blue-500 text-blue-500 rounded-full hover:bg-blue-50 transition-colors duration-200"
                         onClick={handleCreateRoom}
@@ -159,19 +179,19 @@ const GameModeSelector: React.FC<GameModeSelectorProps> = ({ onModeSelect }) => 
                             className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-indigo-500 text-white rounded-full hover:bg-indigo-500/20 transition-colors duration-200 text-xl"
                             onClick={() => onModeSelect('human')}
                         >
-                            Local Game
+                            Online Mode
                         </button>
-                        <button
+                        {/* <button
                             className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-violet-500 text-white rounded-full hover:bg-violet-500/20 transition-colors duration-200 text-xl"
                             onClick={() => setShowRoomOptions(true)}
                         >
                             Online Game
-                        </button>
+                        </button> */}
                         <button
                             className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-emerald-500 text-white rounded-full hover:bg-emerald-500/20 transition-colors duration-200 text-xl"
                             onClick={handleAISelect}
                         >
-                            Player vs AI
+                            Local Game
                         </button>
                         <button
                             className="w-full px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-red-500 text-white rounded-full hover:bg-red-500/20 transition-colors duration-200 text-xl"
