@@ -23,15 +23,9 @@ const storage = multer.diskStorage({
 });
 
 // Set file size limit to 5MB
-// Allowed file types for encoding
+// Allowed MIME types - only text files for encoding
 const ALLOWED_MIME_TYPES = [
-  'text/plain',
-  'text/csv',
-  'application/json',
-  'application/xml',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  'text/plain'
 ];
 
 const upload = multer({
@@ -42,18 +36,23 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     console.log('Received file:', file.originalname, 'MIME type:', file.mimetype);
     
-    // Allow PGN files for decoding
+    if (req.path === '/encode') {
+      // For encoding, only allow text files
+      if (file.mimetype === 'text/plain') {
+        cb(null, true);
+        return;
+      }
+      cb(new Error('Only text files (.txt) are allowed for encoding'));
+      return;
+    }
+    
+    // For decoding, only allow PGN files
     if (req.path === '/decode' && file.originalname.toLowerCase().endsWith('.pgn')) {
       cb(null, true);
       return;
     }
-
-    // For encoding, check allowed MIME types
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Invalid file type. For encoding, allowed types are: ${ALLOWED_MIME_TYPES.join(', ')}. For decoding, only .pgn files are allowed.`));
-    }
+    
+    cb(new Error('Invalid file type. For encoding, only .txt files are allowed. For decoding, only .pgn files are allowed.'));
   }
 });
 
@@ -73,39 +72,63 @@ router.post('/encode', (req: Request, res: Response, next: NextFunction) => {
     }
     
     (async () => {
-  console.log('Received encode request');
-  console.log('File:', req.file);
-  try {
-    if (!req.file) {
-      res.status(400).json({ error: 'No file uploaded' });
-      return;
-    }
+      console.log('Received encode request');
+      console.log('File:', req.file);
+      try {
+        if (!req.file) {
+          res.status(400).json({ error: 'No file uploaded' });
+          return;
+        }
 
-    console.log('File path:', req.file.path);
-    try {
-      const pgn = encode(req.file.path);
-      console.log('Encoding successful');
-      
-      // Clean up the uploaded file
-      fs.unlinkSync(req.file.path);
-      
-      res.status(200).json({ pgn });
-    } catch (encodeError) {
-      console.error('Encoding failed:', encodeError);
-      throw encodeError;
-    }
-    return;
-    } catch (error) {
-      console.error('Encode error:', error);
-      console.error('Error details:', error instanceof Error ? error.message : error);
-      res.status(500).json({ error: 'Failed to encode file', details: error instanceof Error ? error.message : String(error) });
-      return;
-    }
-  })();
+        // Validate the file exists and is readable
+        if (!fs.existsSync(req.file.path)) {
+          throw new Error('Uploaded file not found on server');
+        }
+
+        // Check file size
+        const stats = fs.statSync(req.file.path);
+        if (stats.size === 0) {
+          throw new Error('File is empty');
+        }
+
+        // Validate it's a text file
+        if (!req.file.mimetype || req.file.mimetype !== 'text/plain') {
+          throw new Error('Only text files are supported for encoding');
+        }
+
+        console.log('File path:', req.file.path);
+        try {
+          const pgn = encode(req.file.path);
+          console.log('Encoding successful, PGN length:', pgn.length);
+          
+          // Validate the generated PGN
+          if (!pgn || pgn.trim() === '') {
+            throw new Error('Generated PGN is empty');
+          }
+
+          // Clean up the uploaded file
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch (unlinkError) {
+            console.warn('Failed to delete uploaded file:', unlinkError);
+            // Continue execution, this is not a critical error
+          }
+          
+          res.status(200).json({ pgn });
+        } catch (encodeError) {
+          console.error('Encoding failed:', encodeError);
+          throw encodeError;
+        }
+      } catch (error) {
+        console.error('Encode error:', error);
+        console.error('Error details:', error instanceof Error ? error.message : error);
+        res.status(500).json({ error: 'Failed to encode file', details: error instanceof Error ? error.message : String(error) });
+      }
+    })();
   });
 });
 
-// Decode endpoint - converts PGN back to original file
+// Decode endpoint - converts PGN back to text file
 router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
   upload.single('file')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
@@ -127,15 +150,9 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
           return;
         }
 
-        const outputFormat = req.body.outputFormat || 'txt';
+        // Only txt output format is supported
+        const outputFormat = 'txt';
         console.log('Decoding to format:', outputFormat);
-
-        // Validate output format
-        const validFormats = ['txt', 'json', 'xml', 'csv', 'pdf', 'doc'];
-        if (!validFormats.includes(outputFormat)) {
-          res.status(400).json({ error: 'Invalid output format' });
-          return;
-        }
 
         let outputPath: string;
         try {
@@ -148,8 +165,11 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
             throw new Error('PGN file is empty');
           }
 
-          // Create output path for decoded file with extension
-          const extension = outputFormat === 'doc' ? 'docx' : outputFormat;
+          // More lenient PGN format validation - just check if it's not empty
+          // Some PGN files might not follow the standard format
+          console.log('Processing PGN content regardless of format');
+          
+          // Create output path for decoded file
           const uploadsDir = path.join(process.cwd(), 'uploads');
           
           // Ensure uploads directory exists
@@ -157,16 +177,27 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
             fs.mkdirSync(uploadsDir, { recursive: true });
           }
           
-          outputPath = path.join(uploadsDir, `decoded-${Date.now()}.${extension}`);
+          outputPath = path.join(uploadsDir, `decoded-${Date.now()}.txt`);
           console.log('Output path:', outputPath);
 
           // Decode the PGN to the original file
           console.log('Starting decode process...');
-          decode(pgnContent, outputPath);
-          console.log('Decode successful');
+          try {
+            decode(pgnContent, outputPath);
+            console.log('Decode successful');
+          } catch (decodeError) {
+            console.error('Decode error:', decodeError);
+            throw new Error(`Failed to decode PGN: ${decodeError instanceof Error ? decodeError.message : String(decodeError)}`);
+          }
 
           if (!fs.existsSync(outputPath)) {
             throw new Error('Decoded file was not created');
+          }
+          
+          // Check if the output file is empty
+          const stats = fs.statSync(outputPath);
+          if (stats.size === 0) {
+            throw new Error('Decoded file is empty');
           }
         } catch (error) {
           console.error('Decode process error:', error);
@@ -176,7 +207,7 @@ router.post('/decode', (req: Request, res: Response, next: NextFunction) => {
         // Stream the decoded file back to client
         try {
           await new Promise<void>((resolve, reject) => {
-            res.download(outputPath!, 'decoded-file', (err) => {
+            res.download(outputPath!, 'decoded-file.txt', (err) => {
               if (err) {
                 console.error('Download error:', err);
                 reject(new Error('Failed to download file'));
